@@ -1,12 +1,14 @@
 # pmo
 An sqlalchemy schema for a project mgmt system.
 
-Generates an graphviz graph.
+Generates a graphviz graph.
 
 
 ## Requirements
 
-Requires sqlalchemy, graphviz
+Requires `sqlalchemy`, `graphviz`
+
+Development requirements: `pytest`
 
 ## Concepts
 

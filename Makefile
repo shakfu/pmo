@@ -1,7 +1,9 @@
-.PHONY: all clean
+.PHONY: all test clean
 
-all:
-	@python3 pmo.py
+all: test
+
+test:
+	@pytest
 
 clean:
-	@rm -rf build cluster.gv cluster.gv.pdf
+	@rm -rf build tests/build .pytest_cache

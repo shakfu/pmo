@@ -1,10 +1,9 @@
 from graphviz import Digraph
 
-g = Digraph('G', filename='cluster.gv')
+g = Digraph('G', filename='build/cluster.gv')
 
 # NOTE: the subgraph name needs to begin with 'cluster' (all lowercase)
 #       so that Graphviz recognizes it as a special cluster subgraph
-
 with g.subgraph(name='cluster_0') as c:
     c.attr(style='filled', color='lightgrey')
     c.node_attr.update(style='filled', color='white')
@@ -29,4 +28,3 @@ g.node('start', shape='Mdiamond')
 g.node('end', shape='Msquare')
 
 g.view()
-
