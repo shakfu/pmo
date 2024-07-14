@@ -76,6 +76,13 @@ class BusinessUnit(CommonMixin, Base):
     parent = relationship("BusinessUnit", back_populates="children", remote_side=[id])
     children = relationship("BusinessUnit")
 
+    managed_by: Mapped["Position"] = relationship(back_populates="manages")
+
+    positions: Mapped[List["Position"]] = relationship(
+        back_populates="businessunit", cascade="all, delete-orphan",
+        overlaps="managed_by"
+    )
+
     projects: Mapped[List["Project"]] = relationship(
         back_populates="businessunit", cascade="all, delete-orphan"
     )
@@ -86,7 +93,7 @@ class BusinessUnit(CommonMixin, Base):
 
     def mk_graph(self):
         import graphviz
-        g = graphviz.Digraph('pmo', comment='objectives / keyresults',
+        g = graphviz.Digraph('pmo', comment='dag',
             graph_attr=dict(rankdir="LR"))
 
         # with g.subgraph(name='cluster_0') as c:
@@ -96,6 +103,9 @@ class BusinessUnit(CommonMixin, Base):
         #     c.attr(label='process #1')
 
         self.register(g)
+        self.managed_by.register(g, edge=self)
+        for pos in self.positions:
+            pos.register(g, edge=pos.parent)
         for p in self.projects:
             p.register(g, edge=self)
             for c in p.controlaccounts:
@@ -120,6 +130,36 @@ class BusinessUnit(CommonMixin, Base):
 #     __mapper_args__ = {
 #         "polymorphic_identity": "cluster",
 #     }
+
+# -----------------------------------------------------------------------------
+# Org
+
+class Position(CommonMixin, Base):
+    """A position of responsibility in an organization structure
+
+    Can be filled or vacant
+    """
+    __node_attr__ = { 'shape':'box', 'style': 'filled', 'fillcolor': 'honeydew'}
+
+    __mapper_args__ = {
+        "polymorphic_on": "type",
+        "polymorphic_identity": "position",
+    }
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parent_id = mapped_column(ForeignKey(f"position.id"))
+    type: Mapped[str]
+    name: Mapped[str]
+
+    parent = relationship("Position", back_populates="children", remote_side=[id])
+    children = relationship("Position")
+
+    businessunit_id: Mapped[int] = mapped_column(ForeignKey("businessunit.id"))
+    businessunit: Mapped["BusinessUnit"] = relationship(back_populates="positions",
+        overlaps="managed_by")
+
+    manages: Mapped["BusinessUnit"] = relationship(back_populates="managed_by",
+        overlaps="businessunit,positions")
 
 # -----------------------------------------------------------------------------
 # Planning / OKR
