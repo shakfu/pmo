@@ -93,36 +93,54 @@ class BusinessUnit(CommonMixin, Base):
 
     def mk_graph(self):
         import graphviz
-        g = graphviz.Digraph('pmo', comment='dag',
-            graph_attr=dict(rankdir="LR"))
-
-        # with g.subgraph(name='cluster_0') as c:
-        #     c.attr(style='filled', color='lightgrey')
-        #     c.node_attr.update(style='filled', color='white')
-        #     c.edges([('a0', 'a1'), ('a1', 'a2'), ('a2', 'a3')])
-        #     c.attr(label='process #1')
+        g = graphviz.Digraph('pmo', comment='dag',)
+        # graph_attr=dict(rankdir="LR")
 
         self.register(g)
         self.managed_by.register(g, edge=self)
-        for pos in self.positions:
-            pos.register(g, edge=pos.parent)
+        # with g.subgraph(name='cluster_0') as c:
+        #     c.attr(style='filled', color='lightgrey')
+        #     c.node_attr.update(cstyle='filled', color='white')
+        #     c.edges([('a0', 'a1'), ('a1', 'a2'), ('a2', 'a3')])
+        #     c.attr(label='process #1')
+        with g.subgraph(name="cluster_1") as c:
+            c.attr(color='blue')
+            c.node_attr['style'] = 'filled'
+            # c.edges([('b0', 'b1'), ('b1', 'b2'), ('b2', 'b3')])
+            c.attr(label='orgchart')
+            for pos in self.positions:
+                pos.register(c, edge=pos.parent)
+
         for p in self.projects:
             p.register(g, edge=self)
-            for c in p.controlaccounts:
-                c.register(g, edge=p)
-                for w in c.workpackages:
-                    w.register(g, edge=c)
-            for r in p.risks:
-                r.register(g, edge=p)
+
+        with g.subgraph(name="cluster_2") as c:
+            c.attr(color='blue')
+            c.node_attr['style'] = 'filled'
+            c.attr(label='projects')
+            for p in self.projects:
+                # p.register(c, edge=self)
+                for ca in p.controlaccounts:
+                    ca.register(c, edge=p)
+                    for w in ca.workpackages:
+                        w.register(c, edge=ca)
+                for r in p.risks:
+                    r.register(c, edge=p)
 
         for bp in self.businessplans:
             bp.register(g, edge=self)
-            for obj in bp.objectives:
-                obj.register(g, edge=bp)
-                for k in obj.keyresults:
-                    k.register(g, edge=obj)
-                    for ini in k.initiatives:
-                        ini.register(g, edge=k)
+
+        with g.subgraph(name="cluster_3") as c:
+            c.attr(color='blue')
+            c.node_attr['style'] = 'filled'
+            c.attr(label='businessplans')
+            for bp in self.businessplans:
+                for obj in bp.objectives:
+                    obj.register(c, edge=bp)
+                    for k in obj.keyresults:
+                        k.register(c, edge=obj)
+                        for ini in k.initiatives:
+                            ini.register(c, edge=k)
         g.render(directory='build', view=True)
 
 

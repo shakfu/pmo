@@ -21,7 +21,7 @@ def test_models():
     with Session(engine) as session:
         bu = BusinessUnit(name="acme")
         # org structure
-        ceo = Position(name="ceo", type="position", businessunit=bu)
+        ceo = Position(name="ceo", type="position", businessunit=bu, manages=bu)
         coo = Position(name="coo", type="position", businessunit=bu, parent=ceo)
         mgr1 = Position(name="mgr1", type="position", businessunit=bu, parent=coo)
         mgr2 = Position(name="mgr2", type="position", businessunit=bu, parent=coo)
