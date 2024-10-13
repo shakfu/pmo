@@ -13,15 +13,29 @@ Base
             Risk
 """
 from datetime import datetime, date
+import enum
+
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     import graphviz
 
 
-from sqlalchemy import ForeignKey, String, Integer, Float, create_engine
+from sqlalchemy import ForeignKey, String, Integer, Float, create_engine, Enum
 from sqlalchemy.orm import (DeclarativeBase, Mapped, Session, mapped_column,
-                            relationship)
+                            relationship, backref)
 from sqlalchemy.orm import declared_attr
+
+
+# -----------------------------------------------------------------------------
+# Enums
+
+class ProjectType(enum.Enum):
+    substation = 0
+    ohtl = 1
+    ug_cable = 2
+
+# -----------------------------------------------------------------------------
+# Abstract
 
 
 class Base(DeclarativeBase):
@@ -98,15 +112,13 @@ class BusinessUnit(CommonMixin, Base):
 
         self.register(g)
         self.managed_by.register(g, edge=self)
-        # with g.subgraph(name='cluster_0') as c:
-        #     c.attr(style='filled', color='lightgrey')
-        #     c.node_attr.update(cstyle='filled', color='white')
-        #     c.edges([('a0', 'a1'), ('a1', 'a2'), ('a2', 'a3')])
-        #     c.attr(label='process #1')
-        with g.subgraph(name="cluster_1") as c:
+
+        # see: https://github.com/microsoft/pylance-release/issues/4688
+        subgraph = g.subgraph(name="cluster_1")
+        assert subgraph is not None
+        with subgraph as c:
             c.attr(color='blue')
             c.node_attr['style'] = 'filled'
-            # c.edges([('b0', 'b1'), ('b1', 'b2'), ('b2', 'b3')])
             c.attr(label='orgchart')
             for pos in self.positions:
                 pos.register(c, edge=pos.parent)
@@ -114,7 +126,9 @@ class BusinessUnit(CommonMixin, Base):
         for p in self.projects:
             p.register(g, edge=self)
 
-        with g.subgraph(name="cluster_2") as c:
+        subgraph = g.subgraph(name="cluster_2")
+        assert subgraph is not None
+        with subgraph as c:
             c.attr(color='blue')
             c.node_attr['style'] = 'filled'
             c.attr(label='projects')
@@ -130,7 +144,9 @@ class BusinessUnit(CommonMixin, Base):
         for bp in self.businessplans:
             bp.register(g, edge=self)
 
-        with g.subgraph(name="cluster_3") as c:
+        subgraph = g.subgraph(name="cluster_3")
+        assert subgraph is not None
+        with subgraph as c:
             c.attr(color='blue')
             c.node_attr['style'] = 'filled'
             c.attr(label='businessplans')
@@ -239,6 +255,26 @@ class Project(CommonMixin, Base):
     risks: Mapped[List["Risk"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+
+    description: Mapped[str]
+    tender_no: Mapped[str] = mapped_column(unique=True, doc="Tender reference number as per tender invitation")
+    scope_of_work: Mapped[str]
+    category: Mapped[str] = mapped_column(Enum(ProjectType), doc="Project category")
+    funding_currency: Mapped[str] = mapped_column(default="SAR")
+    bid_issue_date: Mapped[date] = mapped_column(doc="The date the tender was released by the client")
+    tender_purchase_date: Mapped[date]
+    tender_purchase_fee: Mapped[float] = mapped_column(default=0.0)
+    bid_due_date: Mapped[date]
+    completion_period_m: Mapped[int] = mapped_column(default=12, doc="When project should be delivered in months from date of award")
+    bid_validity_d: Mapped[int]
+    include_vat: Mapped[bool] = mapped_column(default=False, doc="Include VAT in price")
+    budget: Mapped[float]
+    bid_value: Mapped[float]
+    perf_bond_p: Mapped[float] = mapped_column(default=0.0)
+    advance_pmt_p: Mapped[float] = mapped_column(default=0.0)
+
+
+
 
 
 class ControlAccount(CommonMixin, Base):

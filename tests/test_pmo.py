@@ -33,7 +33,26 @@ def test_models():
         in1 = Initiative(name="Secure M&A financing approval from banks", keyresult=kr1)
 
         # project planning
-        p1 = Project(name="Build gas-station", businessunit=bu)
+        p1 = Project(
+            name="Build gas-station", 
+            businessunit=bu,
+            description="project description",
+            tender_no="proj-1",
+            scope_of_work="the scope of work",
+            category="ohtl",
+            funding_currency="USD",
+            bid_issue_date=date.today(),
+            tender_purchase_date=date.today(),
+            tender_purchase_fee=0.0,
+            bid_due_date=date.today(),
+            completion_period_m=12,
+            bid_validity_d=90,
+            include_vat=False,
+            budget=1000.0,
+            bid_value=1050.0,
+            perf_bond_p=0.0,
+            advance_pmt_p=0.0,
+        )
         ca1 = ControlAccount(name="Mobilization", project=p1)
         r1 = Risk(name="schedule risk", project=p1)
         wp1 = WorkPackage(name="Project management", controlaccount=ca1, start_date=date.today(), end_date=date.today())

@@ -2,7 +2,7 @@
 name = "pmo"
 version = "0.1.0"
 description = "An sqlalchemy schema for a project mgmt system."
-authors = [{ name = "Shakeeb Alireza", email = "sa@me.org" }]
+authors = [{ name = "shakfu", email = "sa@me.org" }]
 dependencies = ["sqlalchemy", "graphviz"]
 readme = "README.md"
 requires-python = ">= 3.8"
