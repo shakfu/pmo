@@ -3,17 +3,17 @@ name = "pmo"
 version = "0.1.0"
 description = "An sqlalchemy schema for a project mgmt system."
 authors = [{ name = "shakfu", email = "sa@me.org" }]
-dependencies = ["sqlalchemy", "graphviz"]
+dependencies = [
+    "sqlalchemy",
+    "graphviz",
+    "openpyxl>=3.1.5",
+]
 readme = "README.md"
 requires-python = ">= 3.8"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.rye]
-managed = true
-dev-dependencies = ["pytest"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -23,3 +23,8 @@ packages = ["src/pmo"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]

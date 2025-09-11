@@ -3,7 +3,7 @@
 all: test
 
 test:
-	@pytest
+	@uv run pytest
 
 clean:
 	@rm -rf build tests/build .pytest_cache
