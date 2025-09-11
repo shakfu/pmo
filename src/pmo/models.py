@@ -13,7 +13,7 @@ Base
             Risk
 """
 
-from datetime import datetime, date
+from datetime import date
 import enum
 
 from typing import List, Optional, TYPE_CHECKING
@@ -22,14 +22,12 @@ if TYPE_CHECKING:
     import graphviz
 
 
-from sqlalchemy import ForeignKey, String, Integer, Float, create_engine, Enum
+from sqlalchemy import ForeignKey, Enum
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
-    Session,
     mapped_column,
     relationship,
-    backref,
 )
 from sqlalchemy.orm import declared_attr
 
@@ -95,7 +93,7 @@ class BusinessUnit(CommonMixin, Base):
     }
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    parent_id = mapped_column(ForeignKey(f"businessunit.id"))
+    parent_id = mapped_column(ForeignKey("businessunit.id"))
     manager_id: Mapped[Optional[int]] = mapped_column(ForeignKey("position.id"))
     type: Mapped[str]
     name: Mapped[str]
@@ -205,7 +203,7 @@ class Position(CommonMixin, Base):
     }
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    parent_id = mapped_column(ForeignKey(f"position.id"))
+    parent_id = mapped_column(ForeignKey("position.id"))
     type: Mapped[str]
     name: Mapped[str]
 
