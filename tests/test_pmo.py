@@ -21,7 +21,7 @@ def test_models():
     with Session(engine) as session:
         bu = BusinessUnit(name="acme")
         # org structure
-        ceo = Position(name="ceo", type="position", businessunit=bu, manages=bu)
+        ceo = Position(name="ceo", type="position", businessunit=bu)
         coo = Position(name="coo", type="position", businessunit=bu, parent=ceo)
         mgr1 = Position(name="mgr1", type="position", businessunit=bu, parent=coo)
         mgr2 = Position(name="mgr2", type="position", businessunit=bu, parent=coo)
@@ -58,5 +58,9 @@ def test_models():
         wp1 = WorkPackage(name="Project management", controlaccount=ca1, start_date=date.today(), end_date=date.today())
 
         session.add_all([bu, bp, r1])
+        session.commit()
+        
+        # Set the management relationship after committing initial objects
+        bu.managed_by = ceo
         session.commit()
         bu.mk_graph()
