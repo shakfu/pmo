@@ -129,6 +129,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
 .venv
 env/
 venv/
@@ -163,9 +164,39 @@ cython_debug/
 # uv
 uv.lock
 
+# bun / PWA
+apps/pwa/node_modules/
+apps/pwa/dist/
+apps/pwa/bun.lockb
+apps/pwa/.env
+apps/pwa/.env.*
+apps/pwa/.cache/
+apps/pwa/coverage/
+apps/pwa/.vercel/
+apps/pwa/.expo/
+apps/pwa/*.log
+apps/pwa/**/*.map
+apps/pwa/**/*.bundle
+apps/pwa/**/*.wasm
+
+# Binary artifacts
+*.exe
+*.dll
+*.dylib
+*.bin
+*.wasm
+
+# Security-sensitive material
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+secrets/
+
 # ai
 .claude
 CLAUDE.md
 AGENTS.md
 GEMINI.md
-
