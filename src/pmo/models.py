@@ -298,6 +298,12 @@ class Project(CommonMixin, Base):
     risks: Mapped[List["Risk"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    contracts: Mapped[List["Contract"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    milestones: Mapped[List["Milestone"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
     description: Mapped[str]
     tender_no: Mapped[str] = mapped_column(
@@ -355,6 +361,9 @@ class WorkPackage(CommonMixin, Base):
     controlaccount: Mapped["ControlAccount"] = relationship(
         back_populates="workpackages"
     )
+    tasks: Mapped[List["Task"]] = relationship(
+        back_populates="workpackage", cascade="all, delete-orphan"
+    )
     is_planned: Mapped[bool] = mapped_column(
         insert_default=False
     )  # i.e. is still a planning package
@@ -379,3 +388,68 @@ class Risk(CommonMixin, Base):
 
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
     project: Mapped["Project"] = relationship(back_populates="risks")
+
+
+# -----------------------------------------------------------------------------
+# Financial Management
+
+
+class Contract(CommonMixin, Base):
+    __node_attr__ = {"shape": "box", "style": "filled", "fillcolor": "lightgoldenrodyellow"}
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    project: Mapped["Project"] = relationship(back_populates="contracts")
+    value: Mapped[float] = mapped_column(default=0.0)
+    status: Mapped[str]
+
+
+class Budget(CommonMixin, Base):
+    __node_attr__ = {"shape": "box", "style": "filled", "fillcolor": "lightcyan"}
+
+    project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("project.id"))
+    workpackage_id: Mapped[Optional[int]] = mapped_column(ForeignKey("workpackage.id"))
+    planned: Mapped[float] = mapped_column(default=0.0)
+    actual: Mapped[float] = mapped_column(default=0.0)
+
+
+class Expense(CommonMixin, Base):
+    __node_attr__ = {"shape": "box", "style": "filled", "fillcolor": "lavender"}
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    workpackage_id: Mapped[Optional[int]] = mapped_column(ForeignKey("workpackage.id"))
+    amount: Mapped[float]
+    date: Mapped[date]
+    description: Mapped[str]
+
+
+# -----------------------------------------------------------------------------
+# Project and Task Management
+
+
+class Task(CommonMixin, Base):
+    __node_attr__ = {"shape": "ellipse", "style": "filled", "fillcolor": "seashell"}
+
+    workpackage_id: Mapped[int] = mapped_column(ForeignKey("workpackage.id"))
+    workpackage: Mapped["WorkPackage"] = relationship(back_populates="tasks")
+    start_date: Mapped[date]
+    end_date: Mapped[date]
+    is_complete: Mapped[bool] = mapped_column(default=False)
+
+
+class Milestone(CommonMixin, Base):
+    __node_attr__ = {"shape": "diamond", "style": "filled", "fillcolor": "khaki"}
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    project: Mapped["Project"] = relationship(back_populates="milestones")
+    due_date: Mapped[date]
+    is_complete: Mapped[bool] = mapped_column(default=False)
+
+
+class Dependency(Base):
+    __tablename__ = "dependency"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    predecessor_id: Mapped[int] = mapped_column(ForeignKey("task.id"))
+    successor_id: Mapped[int] = mapped_column(ForeignKey("task.id"))
+
+    predecessor: Mapped["Task"] = relationship(foreign_keys=[predecessor_id])
+    successor: Mapped["Task"] = relationship(foreign_keys=[successor_id])
