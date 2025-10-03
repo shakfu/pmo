@@ -6,11 +6,13 @@ Provides CRUD operations for business units, positions, projects, and business p
 """
 
 import argparse
+import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
+import uvicorn
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,8 @@ from .models import (
     Risk,
     ProjectType,
 )
+from .db import create_session_factory
+from .sample_data import create_sample_data
 
 
 class PMOCli:
@@ -365,6 +369,20 @@ def main():
         default="build",
         help="Target directory for rendered graph files",
     )
+
+    serve_parser = subparsers.add_parser("serve", help="Launch the FastAPI admin server")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
+    serve_parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    serve_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable auto-reload (requires import string startup)",
+    )
+    serve_parser.add_argument(
+        "--seed",
+        action="store_true",
+        help="Preload the database with sample fixtures before starting",
+    )
     
     args = parser.parse_args()
     
@@ -425,6 +443,29 @@ def main():
         else:
             obj_parser.print_help()
     
+    elif args.command == "serve":
+        db_url = args.db
+        if args.seed:
+            session_factory = create_session_factory(db_url)
+            with session_factory() as session:
+                create_sample_data(session)
+
+        os.environ.setdefault("PMO_DATABASE_URL", db_url)
+
+        if args.reload:
+            uvicorn.run(
+                "pmo.api.app:app",
+                host=args.host,
+                port=args.port,
+                reload=True,
+                factory=False,
+            )
+        else:
+            from .api.app import create_app
+
+            app = create_app(db_url)
+            uvicorn.run(app, host=args.host, port=args.port, reload=False)
+
     # Handle Graph command
     elif args.command == "graph":
         cli.generate_graph(

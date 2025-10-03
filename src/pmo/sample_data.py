@@ -35,6 +35,26 @@ def create_sample_data(session: Session) -> dict[str, object]:
     or demo scripts.
     """
 
+    existing = session.query(BusinessUnit).filter_by(name="Acme Power").first()
+    if existing:
+        positions_by_name = {pos.name: pos for pos in existing.positions}
+        project = existing.projects[0] if existing.projects else None
+        work_package = None
+        if project and project.controlaccounts:
+            control_account = project.controlaccounts[0]
+            work_package = control_account.workpackages[0] if control_account.workpackages else None
+
+        return {
+            "business_unit": existing,
+            "project": project,
+            "work_package": work_package,
+            "positions": {
+                "ceo": positions_by_name.get("Chief Executive Officer"),
+                "coo": positions_by_name.get("Chief Operations Officer"),
+                "pm": positions_by_name.get("Project Manager"),
+            },
+        }
+
     bu = BusinessUnit(name="Acme Power", type="businessunit")
 
     ceo = Position(name="Chief Executive Officer", type="position", businessunit=bu)
