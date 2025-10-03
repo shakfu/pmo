@@ -243,17 +243,27 @@ class PMOCli:
             return obj.id
 
     # Graph generation
-    def generate_graph(self, businessunit_id: int):
+    def generate_graph(
+        self,
+        businessunit_id: int,
+        *,
+        render: bool = True,
+        view: bool = False,
+        directory: str = "build",
+    ):
         """Generate organizational graph for a business unit"""
         with self.get_session() as session:
             unit = session.get(BusinessUnit, businessunit_id)
             if not unit:
                 print(f"Business unit {businessunit_id} not found.")
                 return
-            
+
             try:
-                unit.mk_graph()
-                print(f"Graph generated for {unit.name} in build/ directory")
+                unit.mk_graph(directory=directory, render=render, view=view)
+                if render:
+                    print(f"Graph generated for {unit.name} in {directory}/")
+                else:
+                    print(f"Graph created in-memory for {unit.name}; rendering skipped")
             except Exception as e:
                 print(f"Error generating graph: {e}")
 
@@ -340,6 +350,21 @@ def main():
     # Graph command
     graph_parser = subparsers.add_parser("graph", help="Generate organizational graph")
     graph_parser.add_argument("businessunit_id", type=int, help="Business unit ID")
+    graph_parser.add_argument(
+        "--view",
+        action="store_true",
+        help="Open the rendered graph with the system viewer",
+    )
+    graph_parser.add_argument(
+        "--no-render",
+        action="store_true",
+        help="Skip rendering to disk (useful in headless environments)",
+    )
+    graph_parser.add_argument(
+        "--directory",
+        default="build",
+        help="Target directory for rendered graph files",
+    )
     
     args = parser.parse_args()
     
@@ -402,7 +427,12 @@ def main():
     
     # Handle Graph command
     elif args.command == "graph":
-        cli.generate_graph(args.businessunit_id)
+        cli.generate_graph(
+            args.businessunit_id,
+            render=not args.no_render,
+            view=args.view,
+            directory=args.directory,
+        )
 
 
 if __name__ == "__main__":

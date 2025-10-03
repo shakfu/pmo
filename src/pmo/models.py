@@ -42,6 +42,28 @@ class ProjectType(enum.Enum):
     ug_cable = 2
 
 
+class ProjectLifecycleStage(enum.Enum):
+    prospect = "prospect"
+    bidding = "bidding"
+    awarded = "awarded"
+    in_progress = "in_progress"
+    closed = "closed"
+
+
+class IssueStatus(enum.Enum):
+    open = "open"
+    in_progress = "in_progress"
+    resolved = "resolved"
+    closed = "closed"
+
+
+class ChangeRequestStatus(enum.Enum):
+    draft = "draft"
+    submitted = "submitted"
+    approved = "approved"
+    rejected = "rejected"
+
+
 # -----------------------------------------------------------------------------
 # Abstract
 
@@ -120,7 +142,14 @@ class BusinessUnit(CommonMixin, Base):
         back_populates="businessunit", cascade="all, delete-orphan"
     )
 
-    def mk_graph(self):
+    def mk_graph(
+        self,
+        directory: str = "build",
+        filename: Optional[str] = None,
+        *,
+        render: bool = True,
+        view: bool = False,
+    ):
         import graphviz
 
         g = graphviz.Digraph(
@@ -160,6 +189,17 @@ class BusinessUnit(CommonMixin, Base):
                         w.register(c, edge=ca)
                 for r in p.risks:
                     r.register(c, edge=p)
+                for status in p.status_history:
+                    status.register(c, edge=p)
+                for assignment in p.resource_assignments:
+                    parent = assignment.task or assignment.workpackage or p
+                    assignment.register(c, edge=parent)
+                for issue in p.issues:
+                    parent = issue.task or issue.workpackage or p
+                    issue.register(c, edge=parent)
+                for change in p.change_requests:
+                    parent = change.workpackage or p
+                    change.register(c, edge=parent)
 
         for bp in self.businessplans:
             bp.register(g, edge=self)
@@ -177,7 +217,9 @@ class BusinessUnit(CommonMixin, Base):
                         k.register(c, edge=obj)
                         for ini in k.initiatives:
                             ini.register(c, edge=k)
-        g.render(directory="build", view=True)
+        if render:
+            g.render(filename=filename, directory=directory, view=view)
+        return g
 
 
 # class Cluster(BusinessUnit):
@@ -221,6 +263,20 @@ class Position(CommonMixin, Base):
         back_populates="managed_by",
         foreign_keys="BusinessUnit.manager_id",
         overlaps="businessunit,positions",
+    )
+    assignments: Mapped[List["ResourceAssignment"]] = relationship(
+        "ResourceAssignment",
+        back_populates="position",
+    )
+    owned_issues: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        back_populates="owner",
+        foreign_keys="Issue.owner_id",
+    )
+    requested_changes: Mapped[List["ChangeRequest"]] = relationship(
+        "ChangeRequest",
+        back_populates="requested_by",
+        foreign_keys="ChangeRequest.requested_by_id",
     )
 
 
@@ -304,13 +360,40 @@ class Project(CommonMixin, Base):
     milestones: Mapped[List["Milestone"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    status_history: Mapped[List["ProjectStatusHistory"]] = relationship(
+        "ProjectStatusHistory",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ProjectStatusHistory.effective_date",
+        foreign_keys="ProjectStatusHistory.project_id",
+    )
+    issues: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        foreign_keys="Issue.project_id",
+    )
+    change_requests: Mapped[List["ChangeRequest"]] = relationship(
+        "ChangeRequest",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        foreign_keys="ChangeRequest.project_id",
+    )
+    resource_assignments: Mapped[List["ResourceAssignment"]] = relationship(
+        "ResourceAssignment",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        foreign_keys="ResourceAssignment.project_id",
+    )
 
     description: Mapped[str]
     tender_no: Mapped[str] = mapped_column(
         unique=True, doc="Tender reference number as per tender invitation"
     )
     scope_of_work: Mapped[str]
-    category: Mapped[str] = mapped_column(Enum(ProjectType), doc="Project category")
+    category: Mapped[ProjectType] = mapped_column(
+        Enum(ProjectType), default=ProjectType.substation, doc="Project category"
+    )
     funding_currency: Mapped[str] = mapped_column(default="SAR")
     bid_issue_date: Mapped[date] = mapped_column(
         doc="The date the tender was released by the client"
@@ -364,6 +447,21 @@ class WorkPackage(CommonMixin, Base):
     tasks: Mapped[List["Task"]] = relationship(
         back_populates="workpackage", cascade="all, delete-orphan"
     )
+    resource_assignments: Mapped[List["ResourceAssignment"]] = relationship(
+        "ResourceAssignment",
+        back_populates="workpackage",
+        foreign_keys="ResourceAssignment.workpackage_id",
+    )
+    issues: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        back_populates="workpackage",
+        foreign_keys="Issue.workpackage_id",
+    )
+    change_requests: Mapped[List["ChangeRequest"]] = relationship(
+        "ChangeRequest",
+        back_populates="workpackage",
+        foreign_keys="ChangeRequest.workpackage_id",
+    )
     is_planned: Mapped[bool] = mapped_column(
         insert_default=False
     )  # i.e. is still a planning package
@@ -407,7 +505,9 @@ class Budget(CommonMixin, Base):
     __node_attr__ = {"shape": "box", "style": "filled", "fillcolor": "lightcyan"}
 
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("project.id"))
-    workpackage_id: Mapped[Optional[int]] = mapped_column(ForeignKey("workpackage.id"))
+    workpackage_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workpackage.id", ondelete="SET NULL")
+    )
     planned: Mapped[float] = mapped_column(default=0.0)
     actual: Mapped[float] = mapped_column(default=0.0)
 
@@ -416,7 +516,9 @@ class Expense(CommonMixin, Base):
     __node_attr__ = {"shape": "box", "style": "filled", "fillcolor": "lavender"}
 
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
-    workpackage_id: Mapped[Optional[int]] = mapped_column(ForeignKey("workpackage.id"))
+    workpackage_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workpackage.id", ondelete="SET NULL")
+    )
     amount: Mapped[float]
     date: Mapped[date]
     description: Mapped[str]
@@ -434,6 +536,16 @@ class Task(CommonMixin, Base):
     start_date: Mapped[date]
     end_date: Mapped[date]
     is_complete: Mapped[bool] = mapped_column(default=False)
+    resource_assignments: Mapped[List["ResourceAssignment"]] = relationship(
+        "ResourceAssignment",
+        back_populates="task",
+        foreign_keys="ResourceAssignment.task_id",
+    )
+    issues: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        back_populates="task",
+        foreign_keys="Issue.task_id",
+    )
 
 
 class Milestone(CommonMixin, Base):
@@ -453,3 +565,133 @@ class Dependency(Base):
 
     predecessor: Mapped["Task"] = relationship(foreign_keys=[predecessor_id])
     successor: Mapped["Task"] = relationship(foreign_keys=[successor_id])
+
+
+class ProjectStatusHistory(CommonMixin, Base):
+    __node_attr__ = {
+        "shape": "box",
+        "style": "filled",
+        "fillcolor": "lightsteelblue",
+    }
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    project: Mapped["Project"] = relationship(
+        back_populates="status_history",
+        foreign_keys=[project_id],
+    )
+    stage: Mapped[ProjectLifecycleStage] = mapped_column(Enum(ProjectLifecycleStage))
+    effective_date: Mapped[date]
+    notes: Mapped[Optional[str]] = mapped_column(default=None)
+
+
+class ResourceAssignment(CommonMixin, Base):
+    __node_attr__ = {
+        "shape": "box",
+        "style": "filled",
+        "fillcolor": "mintcream",
+    }
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    project: Mapped["Project"] = relationship(
+        back_populates="resource_assignments",
+        foreign_keys=[project_id],
+    )
+    position_id: Mapped[int] = mapped_column(ForeignKey("position.id"))
+    position: Mapped["Position"] = relationship(
+        back_populates="assignments",
+        foreign_keys=[position_id],
+    )
+    workpackage_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workpackage.id", ondelete="SET NULL")
+    )
+    workpackage: Mapped[Optional["WorkPackage"]] = relationship(
+        back_populates="resource_assignments",
+        foreign_keys=[workpackage_id],
+    )
+    task_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("task.id", ondelete="SET NULL")
+    )
+    task: Mapped[Optional["Task"]] = relationship(
+        back_populates="resource_assignments",
+        foreign_keys=[task_id],
+    )
+    role: Mapped[str]
+    allocation_percent: Mapped[float] = mapped_column(default=100.0)
+    start_date: Mapped[date]
+    end_date: Mapped[Optional[date]]
+
+
+class Issue(CommonMixin, Base):
+    __node_attr__ = {
+        "shape": "box",
+        "style": "filled",
+        "fillcolor": "salmon",
+    }
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    project: Mapped["Project"] = relationship(
+        back_populates="issues",
+        foreign_keys=[project_id],
+    )
+    workpackage_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workpackage.id", ondelete="SET NULL")
+    )
+    workpackage: Mapped[Optional["WorkPackage"]] = relationship(
+        back_populates="issues",
+        foreign_keys=[workpackage_id],
+    )
+    task_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("task.id", ondelete="SET NULL")
+    )
+    task: Mapped[Optional["Task"]] = relationship(
+        back_populates="issues",
+        foreign_keys=[task_id],
+    )
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("position.id", ondelete="SET NULL")
+    )
+    owner: Mapped[Optional["Position"]] = relationship(
+        back_populates="owned_issues",
+        foreign_keys=[owner_id],
+    )
+    status: Mapped[IssueStatus] = mapped_column(
+        Enum(IssueStatus), default=IssueStatus.open
+    )
+    severity: Mapped[str]
+    opened_on: Mapped[date]
+    closed_on: Mapped[Optional[date]]
+    description: Mapped[Optional[str]] = mapped_column(default=None)
+
+
+class ChangeRequest(CommonMixin, Base):
+    __node_attr__ = {
+        "shape": "box",
+        "style": "filled",
+        "fillcolor": "lightcoral",
+    }
+
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"))
+    project: Mapped["Project"] = relationship(
+        back_populates="change_requests",
+        foreign_keys=[project_id],
+    )
+    workpackage_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workpackage.id", ondelete="SET NULL")
+    )
+    workpackage: Mapped[Optional["WorkPackage"]] = relationship(
+        back_populates="change_requests"
+    )
+    requested_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("position.id", ondelete="SET NULL")
+    )
+    requested_by: Mapped[Optional["Position"]] = relationship(
+        back_populates="requested_changes",
+        foreign_keys=[requested_by_id],
+    )
+    status: Mapped[ChangeRequestStatus] = mapped_column(
+        Enum(ChangeRequestStatus), default=ChangeRequestStatus.draft
+    )
+    submitted_on: Mapped[Optional[date]]
+    approved_on: Mapped[Optional[date]]
+    description: Mapped[Optional[str]] = mapped_column(default=None)
+    impact_summary: Mapped[Optional[str]] = mapped_column(default=None)

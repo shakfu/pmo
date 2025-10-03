@@ -1,69 +1,32 @@
-from datetime import date
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-
 from pmo.models import (
-    Base,
-    BusinessUnit, Position,
-    BusinessPlan, Project, ControlAccount,
-    Risk, WorkPackage, WorkBreakdownStructure,
-    Objective, KeyResult, Initiative
+    ChangeRequestStatus,
+    IssueStatus,
+    ProjectLifecycleStage,
+    ProjectType,
+    Project,
 )
 
-DEBUG=True
 
-def test_models():
-    if DEBUG:
-        engine = create_engine("sqlite://", echo=True)
-    else:
-        engine = create_engine("sqlite:///biz.db", echo=False)
+def test_models(session, sample_dataset):
+    bu = sample_dataset["business_unit"]
+    project: Project = sample_dataset["project"]
+    positions = sample_dataset["positions"]
 
-    Base.metadata.create_all(engine)
+    graph = bu.mk_graph(render=False)
 
-    with Session(engine) as session:
-        bu = BusinessUnit(name="acme")
-        # org structure
-        ceo = Position(name="ceo", type="position", businessunit=bu)
-        coo = Position(name="coo", type="position", businessunit=bu, parent=ceo)
-        mgr1 = Position(name="mgr1", type="position", businessunit=bu, parent=coo)
-        mgr2 = Position(name="mgr2", type="position", businessunit=bu, parent=coo)
-
-        # bp planning
-        bp = BusinessPlan(name="3-year bizplan", businessunit=bu)
-        ob1 = Objective(name="Crush the competition through acquisitions", businessplan=bp)
-        kr1 = KeyResult(name="Acquire 3 small players in our industry", objective=ob1)
-        in1 = Initiative(name="Secure M&A financing approval from banks", keyresult=kr1)
-
-        # project planning
-        p1 = Project(
-            name="Build gas-station", 
-            businessunit=bu,
-            description="project description",
-            tender_no="proj-1",
-            scope_of_work="the scope of work",
-            category="ohtl",
-            funding_currency="USD",
-            bid_issue_date=date.today(),
-            tender_purchase_date=date.today(),
-            tender_purchase_fee=0.0,
-            bid_due_date=date.today(),
-            completion_period_m=12,
-            bid_validity_d=90,
-            include_vat=False,
-            budget=1000.0,
-            bid_value=1050.0,
-            perf_bond_p=0.0,
-            advance_pmt_p=0.0,
-        )
-        ca1 = ControlAccount(name="Mobilization", project=p1)
-        r1 = Risk(name="schedule risk", project=p1)
-        wp1 = WorkPackage(name="Project management", controlaccount=ca1, start_date=date.today(), end_date=date.today())
-
-        session.add_all([bu, bp, r1])
-        session.commit()
-        
-        # Set the management relationship after committing initial objects
-        bu.managed_by = ceo
-        session.commit()
-        bu.mk_graph()
+    refreshed_project = session.get(Project, project.id)
+    assert refreshed_project is not None
+    assert refreshed_project.category is ProjectType.substation
+    assert refreshed_project.status_history[0].stage is ProjectLifecycleStage.awarded
+    assert refreshed_project.resource_assignments[0].position.name == positions["pm"].name
+    assert refreshed_project.issues[0].owner.name == positions["pm"].name
+    assert refreshed_project.change_requests[0].status is ChangeRequestStatus.submitted
+    assert positions["pm"].assignments[0].role == "Lead PM"
+    assert IssueStatus.open in {issue.status for issue in refreshed_project.issues}
+    assert ChangeRequestStatus.submitted in {
+        change.status for change in refreshed_project.change_requests
+    }
+    assert "projectstatushistory" in graph.source
+    assert "resourceassignment" in graph.source
+    assert "issue" in graph.source
+    assert "changerequest" in graph.source

@@ -163,7 +163,9 @@ cython_debug/
 # uv
 uv.lock
 
-# claude
+# ai
 .claude
 CLAUDE.md
+AGENTS.md
+GEMINI.md
 
